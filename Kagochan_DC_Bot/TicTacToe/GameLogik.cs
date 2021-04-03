@@ -1,5 +1,6 @@
 ﻿using Discord.Commands;
 using Discord.WebSocket;
+using Kagochan_DC_Bot.BitmapDraw;
 using Kagochan_DC_Bot.DataManagment;
 using Kagochan_DC_Bot.Initialisation;
 using System;
@@ -16,12 +17,18 @@ namespace Kagochan_DC_Bot.TicTacToe
         private bool playfieldStarted = false;
         private List<Player> playerList = new List<Player>();
         private List<Playfield> playFieldList = new List<Playfield>();
-        private Bitmap bitmap;
+        private Bitmap bitmapPlayfield;
+        private Bitmap bitmapHeader;
+        private Bitmap complete;
+        private AppendBitmap appandBM;
+        private Graphics graphicHeader;
         private Graphics graphics;
         private Pen penField;
         private Pen penP1;
         private Pen penP2;
-        private string bitmapPath = Folder.imageFolder + "tttplayfield.png";
+        private string bitmapPathHeader = Folder.imageFolder + "header.png";
+        private string bitmapPathPlayfield = Folder.imageFolder + "tttplayfield.png";
+        private string bitmapPathCompleteImage = Folder.imageFolder + "completeImage.png";
         private TicTacToe.Draw draw;
         private int bitmapWidth = 999;
         private int bitmapHeight = 999;
@@ -36,6 +43,53 @@ namespace Kagochan_DC_Bot.TicTacToe
             this.client.MessageReceived += Game;
         }
 
+        private void DrawHeader(string nameP1, string nameP2)
+        {
+            this.bitmapHeader = new Bitmap(999, 150, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+            this.graphicHeader = Graphics.FromImage(bitmapHeader);
+            this.graphicHeader.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            this.graphicHeader.DrawString("VS", new Font(FontFamily.GenericSansSerif, 60f), Brushes.Orange, 439, 10);
+
+            float stringP1em = 60f;
+            float stringP2em = 60f;
+            SizeF stringP1 = this.graphicHeader.MeasureString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em));
+            SizeF stringP2 = this.graphicHeader.MeasureString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em));
+            while(stringP1.Width > 350)
+            {
+                stringP1em--;
+                if (stringP1em == 40) break;
+                stringP1 = this.graphicHeader.MeasureString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em));
+            }
+            while (stringP2.Width > 350)
+            {
+                stringP2em--;
+                if (stringP2em == 40) break;
+                stringP2 = this.graphicHeader.MeasureString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em));
+            }
+            this.graphicHeader.DrawString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em), Brushes.DeepSkyBlue, new Rectangle(14, 10, 350-8, 130-8));
+            this.graphicHeader.DrawString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em), Brushes.BlueViolet, new Rectangle(639, 10, 350 - 8, 130 - 8));
+            if (playerList[0].turn == true)
+            {
+                this.graphicHeader.DrawPolygon(new Pen(Brushes.Orange, 5), new Point[] { new Point(430, 25), new Point(375, 55), new Point(430, 85) });
+            }
+            else if(playerList[1].turn == true)
+            {
+                this.graphicHeader.DrawPolygon(new Pen(Brushes.Orange, 5), new Point[] { new Point(578, 25), new Point(633, 55), new Point(578, 85) });
+            }
+
+            try
+            {
+                this.bitmapHeader.Save(bitmapPathHeader);
+            }
+            catch (Exception e)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Fehler 1:\n" + e);
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+        }
+
         private async Task PlayTTT(SocketMessage msg)
         {
             SocketUserMessage msgUser = msg as SocketUserMessage;
@@ -46,7 +100,7 @@ namespace Kagochan_DC_Bot.TicTacToe
             int prefixPosition = 0;
 
             if (!(msgUser.HasCharPrefix(configFile.GetPrefix(), ref prefixPosition) ||
-            msgUser.HasMentionPrefix(client.CurrentUser, ref prefixPosition)) ||
+            msgUser.HasMentionPrefix(this.client.CurrentUser, ref prefixPosition)) ||
             msgUser.Author.IsBot)
                 return;
 
@@ -58,7 +112,7 @@ namespace Kagochan_DC_Bot.TicTacToe
                 return;
             }
 
-            if (playerList.Count == 1 && playerList[0].playerID == msgUser.Author.Id)
+            if (this.playerList.Count == 1 && this.playerList[0].playerID == msgUser.Author.Id)
             {
                 await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Du bist bereits als Spieler 1 registriert, bitte warte auf einen Gegner.");
                 return;
@@ -67,32 +121,46 @@ namespace Kagochan_DC_Bot.TicTacToe
             playerList.Add(new Player
             {
                 playerID = msgUser.Author.Id,
+                playerName = msgUser.Author.Username,
                 turn = false
             });
 
-            if (playerList.Count == 2 && playfieldStarted == false)
+            if (this.playerList.Count == 2 && this.playfieldStarted == false)
             {
-                playfieldStarted = true;
+                this.playfieldStarted = true;
                 await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Du bist Player 2. Los gehts!");
 
                 for (int i = 0; i < 9; i++)
                 {
-                    playFieldList.Add(new Playfield(i));
+                    this.playFieldList.Add(new Playfield(i));
                 }
 
-                this.bitmap = new Bitmap(bitmapWidth, bitmapHeight, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-                this.graphics = Graphics.FromImage(bitmap);
+                this.playerList[0].SetTurn(true);
+
+                this.bitmapPlayfield = new Bitmap(this.bitmapWidth, this.bitmapHeight, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
+                this.graphics = Graphics.FromImage(bitmapPlayfield);
                 this.penField = new Pen(Color.FromKnownColor(KnownColor.Black), penThicknes);
                 this.penP1 = new Pen(Color.FromKnownColor(KnownColor.DeepSkyBlue), penThicknes);
                 this.penP2 = new Pen(Color.FromKnownColor(KnownColor.BlueViolet), penThicknes);
-                draw = new Draw(bitmap, graphics);
+                this.draw = new Draw(bitmapPlayfield, graphics);
+                DrawHeader(this.playerList[0].playerName, this.playerList[1].playerName);
                 DrawField();
-                bitmap.Save(bitmapPath);
+                this.appandBM = new AppendBitmap();
+                this.complete = appandBM.AppendBottom(this.bitmapHeader, this.bitmapPlayfield);
+                try
+                {
 
-                playerList[0].SetTurn(true);
+                this.complete.Save(this.bitmapPathCompleteImage);
+                }
+                    catch (Exception e)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Fehler 5:\n" + e);
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
 
-                await msgUser.Channel.SendMessageAsync("Du bist dran Player 1! Schreib eine Zahl von 1 - 9 in den Chat um dein Feld zu füllen.");
-                await msgUser.Channel.SendFileAsync(bitmapPath);
+            await msgUser.Channel.SendMessageAsync("Du bist dran <@!" + this.playerList[0].playerID + "> Schreib eine Zahl von 1 - 9 in den Chat um dein Feld zu füllen.");
+                await msgUser.Channel.SendFileAsync(this.bitmapPathCompleteImage);
 
 
             }
@@ -113,18 +181,18 @@ namespace Kagochan_DC_Bot.TicTacToe
             int prefixPosition = 0;
 
             if (!(msgUser.HasCharPrefix(configFile.GetPrefix(), ref prefixPosition) ||
-            msgUser.HasMentionPrefix(client.CurrentUser, ref prefixPosition)) ||
+            msgUser.HasMentionPrefix(this.client.CurrentUser, ref prefixPosition)) ||
             msgUser.Author.IsBot)
                 return;
 
             string[] command = msg.Content.Split(" ");
             if (!(command[0] == configFile.GetPrefix() + "resetttt")) return;
 
-            playfieldStarted = false;
-            playerList.Clear();
-            playerList = new List<Player>();
-            playFieldList.Clear();
-            playFieldList = new List<Playfield>();
+            this.playfieldStarted = false;
+            this.playerList.Clear();
+            this.playerList = new List<Player>();
+            this.playFieldList.Clear();
+            this.playFieldList = new List<Playfield>();
 
             await msgUser.Channel.SendMessageAsync("TicTacToe resetet.");
 
@@ -143,58 +211,85 @@ namespace Kagochan_DC_Bot.TicTacToe
 
             if (playerList[0].turn == true)
             {
-                if (playerList[0].playerID != msgUser.Author.Id) return;
+                if (this.playerList[0].playerID != msgUser.Author.Id) return;
                 if (CheckNumber(msgUser) == -1) return;
-                if (playFieldList[CheckNumber(msgUser) - 1].isSet == true)
+                if (this.playFieldList[CheckNumber(msgUser) - 1].isSet == true)
                 {
                     await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Platz schon belegt!");
                     return;
                 }
-                playFieldList[CheckNumber(msgUser) - 1].SetIsSet(true);
-                playFieldList[CheckNumber(msgUser) - 1].SetPlayer(PlayerOnField.Player1);
-                playerList[0].SetTurn(false);
-                playerList[1].SetTurn(true);
+                this.playFieldList[CheckNumber(msgUser) - 1].SetIsSet(true);
+                this.playFieldList[CheckNumber(msgUser) - 1].SetPlayer(PlayerOnField.Player1);
+                this.playerList[0].SetTurn(false);
+                this.playerList[1].SetTurn(true);
+                DrawHeader(this.playerList[0].playerName, this.playerList[1].playerName);
                 DrawField();
-                await msgUser.Channel.SendFileAsync(bitmapPath);
+                this.complete = appandBM.AppendBottom(this.bitmapHeader, this.bitmapPlayfield);
+                try { 
+
+                this.complete.Save(bitmapPathCompleteImage);
+                }
+                catch (Exception e)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Fehler 2:\n" + e);
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
+
+                await msgUser.Channel.SendFileAsync(this.bitmapPathCompleteImage);
                 if (CheckIfWon())
                 {
                     await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Glückwunsch du hast gewonnen!");
                     ResetGameLists();
-                    playfieldStarted = false;
+                    this.playfieldStarted = false;
                 }
                 if (CheckIfNoOneWon())
                 {
                     await msgUser.Channel.SendMessageAsync("Das war ein Unentschieden. Ihr seid einfach zu gut!");
                     ResetGameLists();
-                    playfieldStarted = false;
+                    this.playfieldStarted = false;
                 }
             }
-            else if (playerList[1].turn == true)
+            else if (this.playerList[1].turn == true)
             {
-                if (playerList[1].playerID != msgUser.Author.Id) return;
+                if (this.playerList[1].playerID != msgUser.Author.Id) return;
                 if (CheckNumber(msgUser) == -1) return;
-                if (playFieldList[CheckNumber(msgUser) - 1].isSet == true)
+                if (this.playFieldList[CheckNumber(msgUser) - 1].isSet == true)
                 {
                     await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Platz schon belegt!");
                     return;
                 }
-                playFieldList[CheckNumber(msgUser) - 1].SetIsSet(true);
-                playFieldList[CheckNumber(msgUser) - 1].SetPlayer(PlayerOnField.Player2);
-                playerList[0].SetTurn(true);
-                playerList[1].SetTurn(false);
+                this.playFieldList[CheckNumber(msgUser) - 1].SetIsSet(true);
+                this.playFieldList[CheckNumber(msgUser) - 1].SetPlayer(PlayerOnField.Player2);
+                this.playerList[0].SetTurn(true);
+                this.playerList[1].SetTurn(false);
+                DrawHeader(this.playerList[0].playerName, this.playerList[1].playerName);
                 DrawField();
-                await msgUser.Channel.SendFileAsync(bitmapPath);
+                this.complete = appandBM.AppendBottom(this.bitmapHeader, this.bitmapPlayfield);
+
+                try 
+                { 
+                this.complete.Save(this.bitmapPathCompleteImage);
+                }
+                catch (Exception e)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("Fehler 3:\n" + e);
+                    Console.ForegroundColor = ConsoleColor.White;
+                }
+
+                await msgUser.Channel.SendFileAsync(this.bitmapPathCompleteImage);
                 if (CheckIfWon())
                 {
                     await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Glückwunsch du hast gewonnen!");
                     ResetGameLists();
-                    playfieldStarted = false;
+                    this.playfieldStarted = false;
                 }
                 if (CheckIfNoOneWon())
                 {
                     await msgUser.Channel.SendMessageAsync("Das war ein Unentschieden. Ihr seid einfach zu gut!");
                     ResetGameLists();
-                    playfieldStarted = false;
+                    this.playfieldStarted = false;
                 }
             }
         }
@@ -209,20 +304,29 @@ namespace Kagochan_DC_Bot.TicTacToe
 
         private void DrawField()
         {
-            draw.DrawTicTacToeField(penField);
+            this.draw.DrawTicTacToeField(this.penField);
             for (int i = 0; i < 9; i++)
             {
-                if (playFieldList[i].playerOnField == PlayerOnField.Player1)
+                if (this.playFieldList[i].playerOnField == PlayerOnField.Player1)
                 {
-                    draw.DrawCircle(i + 1, penP1);
+                    this.draw.DrawCircle(i + 1, this.penP1);
                 }
-                else if (playFieldList[i].playerOnField == PlayerOnField.Player2)
+                else if (this.playFieldList[i].playerOnField == PlayerOnField.Player2)
                 {
-                    draw.DrawCross(i + 1, penP2);
+                    this.draw.DrawCross(i + 1, this.penP2);
                 }
             }
-            bitmap.Save(bitmapPath);
-        }
+            try
+            {
+            this.bitmapPlayfield.Save(bitmapPathPlayfield);
+            }
+            catch (Exception e)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Fehler 4:\n" + e);
+                Console.ForegroundColor = ConsoleColor.White;
+            }
+}
 
         private int CheckNumber(SocketUserMessage msgUser)
         {
@@ -249,68 +353,68 @@ namespace Kagochan_DC_Bot.TicTacToe
             bool won = false;
 
             // First Row
-            if (playFieldList[0].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[1].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[2].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[0].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[1].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[2].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[0].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[1].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[2].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[0].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[1].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[2].playerOnField == PlayerOnField.Player2)
                 won = true;
             // Second Row
-            if (playFieldList[3].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[5].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[3].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[5].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[3].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[5].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[3].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[5].playerOnField == PlayerOnField.Player2)
                 won = true;
             // Third Row
-            if (playFieldList[6].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[7].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[8].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[6].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[7].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[8].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[6].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[7].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[8].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[6].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[7].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[8].playerOnField == PlayerOnField.Player2)
                 won = true;
             // First Column
-            if (playFieldList[0].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[3].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[6].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[0].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[3].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[6].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[0].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[3].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[6].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[0].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[3].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[6].playerOnField == PlayerOnField.Player2)
                 won = true;
             // Second Column
-            if (playFieldList[1].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[7].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[1].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[7].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[1].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[7].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[1].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[7].playerOnField == PlayerOnField.Player2)
                 won = true;
             // Third Column
-            if (playFieldList[2].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[5].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[8].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[2].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[5].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[8].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[2].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[5].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[8].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[2].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[5].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[8].playerOnField == PlayerOnField.Player2)
                 won = true;
             // TopLeft to BottomRight
-            if (playFieldList[0].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[8].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[0].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[8].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[0].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[8].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[0].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[8].playerOnField == PlayerOnField.Player2)
                 won = true;
             // TopRight to BottomLeft
-            if (playFieldList[2].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player1 &&
-                playFieldList[6].playerOnField == PlayerOnField.Player1 ||
-                playFieldList[2].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[4].playerOnField == PlayerOnField.Player2 &&
-                playFieldList[6].playerOnField == PlayerOnField.Player2)
+            if (this.playFieldList[2].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player1 &&
+                this.playFieldList[6].playerOnField == PlayerOnField.Player1 ||
+                this.playFieldList[2].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[4].playerOnField == PlayerOnField.Player2 &&
+                this.playFieldList[6].playerOnField == PlayerOnField.Player2)
                 won = true;
 
             return won;
@@ -321,7 +425,7 @@ namespace Kagochan_DC_Bot.TicTacToe
             bool draw = false;
             int count = 0;
 
-            foreach (var item in playFieldList)
+            foreach (var item in this.playFieldList)
             {
                 if (item.isSet == true)
                     count++;
@@ -336,6 +440,7 @@ namespace Kagochan_DC_Bot.TicTacToe
         public class Player
         {
             public ulong playerID;
+            public string playerName;
             public bool turn;
 
             public void SetTurn(bool turn)
