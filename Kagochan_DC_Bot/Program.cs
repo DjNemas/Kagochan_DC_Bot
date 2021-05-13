@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Kagochan_DC_Bot.Commands;
 using Kagochan_DC_Bot.Initialisation;
 using Kagochan_DC_Bot.TicTacToe;
 using System;
@@ -22,8 +23,10 @@ namespace Kagochan_DC_Bot
 
             _client = new DiscordSocketClient();
             new GameLogik(_client);
+            new General(_client);
 
             _client.Log += Log;
+            _client.GuildAvailable += GuildAvailable;
 
             await _client.LoginAsync(TokenType.Bot, configFile.GetToken());
             await _client.StartAsync();
@@ -36,6 +39,13 @@ namespace Kagochan_DC_Bot
         {
             Console.WriteLine(msg.ToString());
             logMain(msg.ToString(), LogLevel.Log);
+            return Task.CompletedTask;
+        }
+
+        private Task GuildAvailable(SocketGuild guild)
+        {
+            JSONDatabase.GuildSettings setting = new JSONDatabase.GuildSettings();
+            setting.AddGuildToList(guild.Id, guild.SystemChannel.Id);
             return Task.CompletedTask;
         }
     }

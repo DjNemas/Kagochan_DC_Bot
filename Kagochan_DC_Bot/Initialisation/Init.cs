@@ -11,6 +11,7 @@ namespace Kagochan_DC_Bot.Initialisation
             CreateAllFolder();
             this.config = new ConfigFile();
             this.config.CreateConfigFile();
+            JSONDatabase.GuildSettings.LoadDB();
         }
 
         private void CreateAllFolder()

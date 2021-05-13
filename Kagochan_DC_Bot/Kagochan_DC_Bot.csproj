@@ -6,12 +6,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="JSONDatabase\GuildSettings.cs~RF38516535.TMP" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Discord.Net" Version="2.3.1" />
     <PackageReference Include="System.Drawing.Common" Version="5.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="DiscordServices\" />
+    <Folder Include="ExtraFeatures\" />
   </ItemGroup>
 
 </Project>

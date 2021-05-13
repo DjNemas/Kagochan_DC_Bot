@@ -46,48 +46,50 @@ namespace Kagochan_DC_Bot.TicTacToe
         private void DrawHeader(string nameP1, string nameP2)
         {
             this.bitmapHeader = new Bitmap(999, 150, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-            this.graphicHeader = Graphics.FromImage(bitmapHeader);
-            this.graphicHeader.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using (this.graphicHeader = Graphics.FromImage(bitmapHeader))
+                {
+                    this.graphicHeader.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            this.graphicHeader.DrawString("VS", new Font(FontFamily.GenericSansSerif, 60f), Brushes.Orange, 439, 10);
+                    this.graphicHeader.DrawString("VS", new Font(FontFamily.GenericSansSerif, 60f), Brushes.Orange, 439, 10);
 
-            float stringP1em = 60f;
-            float stringP2em = 60f;
-            SizeF stringP1 = this.graphicHeader.MeasureString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em));
-            SizeF stringP2 = this.graphicHeader.MeasureString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em));
-            while(stringP1.Width > 350)
-            {
-                stringP1em--;
-                if (stringP1em == 40) break;
-                stringP1 = this.graphicHeader.MeasureString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em));
-            }
-            while (stringP2.Width > 350)
-            {
-                stringP2em--;
-                if (stringP2em == 40) break;
-                stringP2 = this.graphicHeader.MeasureString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em));
-            }
-            this.graphicHeader.DrawString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em), Brushes.DeepSkyBlue, new Rectangle(14, 10, 350-8, 130-8));
-            this.graphicHeader.DrawString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em), Brushes.BlueViolet, new Rectangle(639, 10, 350 - 8, 130 - 8));
-            if (playerList[0].turn == true)
-            {
-                this.graphicHeader.DrawPolygon(new Pen(Brushes.Orange, 5), new Point[] { new Point(430, 25), new Point(375, 55), new Point(430, 85) });
-            }
-            else if(playerList[1].turn == true)
-            {
-                this.graphicHeader.DrawPolygon(new Pen(Brushes.Orange, 5), new Point[] { new Point(578, 25), new Point(633, 55), new Point(578, 85) });
-            }
+                    float stringP1em = 60f;
+                    float stringP2em = 60f;
+                    SizeF stringP1 = this.graphicHeader.MeasureString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em));
+                    SizeF stringP2 = this.graphicHeader.MeasureString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em));
+                    while (stringP1.Width > 350)
+                    {
+                        stringP1em--;
+                        if (stringP1em == 40) break;
+                        stringP1 = this.graphicHeader.MeasureString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em));
+                    }
+                    while (stringP2.Width > 350)
+                    {
+                        stringP2em--;
+                        if (stringP2em == 40) break;
+                        stringP2 = this.graphicHeader.MeasureString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em));
+                    }
+                    this.graphicHeader.DrawString(nameP1, new Font(FontFamily.GenericSansSerif, stringP1em), Brushes.DeepSkyBlue, new Rectangle(14, 10, 350 - 8, 130 - 8));
+                    this.graphicHeader.DrawString(nameP2, new Font(FontFamily.GenericSansSerif, stringP2em), Brushes.BlueViolet, new Rectangle(639, 10, 350 - 8, 130 - 8));
+                    if (this.playerList[0].turn == true)
+                    {
+                        this.graphicHeader.DrawPolygon(new Pen(Brushes.Orange, 5), new Point[] { new Point(430, 25), new Point(375, 55), new Point(430, 85) });
+                    }
+                    else if (this.playerList[1].turn == true)
+                    {
+                        this.graphicHeader.DrawPolygon(new Pen(Brushes.Orange, 5), new Point[] { new Point(578, 25), new Point(633, 55), new Point(578, 85) });
+                    }
 
-            try
-            {
-                this.bitmapHeader.Save(bitmapPathHeader);
-            }
-            catch (Exception e)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Fehler 1:\n" + e);
-                Console.ForegroundColor = ConsoleColor.White;
-            }
+                    try
+                    {
+                        this.bitmapHeader.Save(bitmapPathHeader);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Fehler 1:\n" + e);
+                        Console.ForegroundColor = ConsoleColor.White;
+                    }
+                }
         }
 
         private async Task PlayTTT(SocketMessage msg)
@@ -95,18 +97,21 @@ namespace Kagochan_DC_Bot.TicTacToe
             SocketUserMessage msgUser = msg as SocketUserMessage;
             if (msgUser == null) return;
 
-            if (msgUser.Channel.Id != configFile.GetTTTChannel()) return;
+            JSONDatabase.GuildSettings guildSetting = new JSONDatabase.GuildSettings();
+            SocketGuildChannel guild = msg.Channel as SocketGuildChannel;
+
+            if (msgUser.Channel.Id != guildSetting.GetTTTChannel(guild.Guild.Id)) return;
 
             int prefixPosition = 0;
 
-            if (!(msgUser.HasCharPrefix(configFile.GetPrefix(), ref prefixPosition) ||
+            if (!(msgUser.HasCharPrefix(guildSetting.GetPrefix(guild.Guild.Id), ref prefixPosition) ||
             msgUser.HasMentionPrefix(this.client.CurrentUser, ref prefixPosition)) ||
             msgUser.Author.IsBot)
                 return;
 
             string[] command = msg.Content.Split(" ");
-            if (!(command[0] == configFile.GetPrefix() + "playttt")) return;
-            if (command[0] == configFile.GetPrefix() + "playttt" && playerList.Count == 2)
+            if (!(command[0] == guildSetting.GetPrefix(guild.Guild.Id) + "playttt")) return;
+            if (command[0] == guildSetting.GetPrefix(guild.Guild.Id) + "playttt" && playerList.Count == 2)
             {
                 await msgUser.Channel.SendMessageAsync(msgUser.Author.Mention + " Es läuft bereits ein Spiel.");
                 return;
@@ -118,7 +123,7 @@ namespace Kagochan_DC_Bot.TicTacToe
                 return;
             }
 
-            playerList.Add(new Player
+            this.playerList.Add(new Player
             {
                 playerID = msgUser.Author.Id,
                 playerName = msgUser.Author.Username,
@@ -138,11 +143,11 @@ namespace Kagochan_DC_Bot.TicTacToe
                 this.playerList[0].SetTurn(true);
 
                 this.bitmapPlayfield = new Bitmap(this.bitmapWidth, this.bitmapHeight, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-                this.graphics = Graphics.FromImage(bitmapPlayfield);
+                this.graphics = Graphics.FromImage(this.bitmapPlayfield);
                 this.penField = new Pen(Color.FromKnownColor(KnownColor.Black), penThicknes);
                 this.penP1 = new Pen(Color.FromKnownColor(KnownColor.DeepSkyBlue), penThicknes);
                 this.penP2 = new Pen(Color.FromKnownColor(KnownColor.BlueViolet), penThicknes);
-                this.draw = new Draw(bitmapPlayfield, graphics);
+                this.draw = new Draw(this.bitmapPlayfield, this.graphics);
                 DrawHeader(this.playerList[0].playerName, this.playerList[1].playerName);
                 DrawField();
                 this.appandBM = new AppendBitmap();
@@ -160,9 +165,7 @@ namespace Kagochan_DC_Bot.TicTacToe
                 }
 
             await msgUser.Channel.SendMessageAsync("Du bist dran <@!" + this.playerList[0].playerID + "> Schreib eine Zahl von 1 - 9 in den Chat um dein Feld zu füllen.");
-                await msgUser.Channel.SendFileAsync(this.bitmapPathCompleteImage);
-
-
+            await msgUser.Channel.SendFileAsync(this.bitmapPathCompleteImage);
             }
 
             if (playfieldStarted == false)
@@ -176,17 +179,20 @@ namespace Kagochan_DC_Bot.TicTacToe
             SocketUserMessage msgUser = msg as SocketUserMessage;
             if (msgUser == null) return;
 
-            if (msgUser.Channel.Id != configFile.GetTTTChannel()) return;
+            JSONDatabase.GuildSettings guildSetting = new JSONDatabase.GuildSettings();
+            SocketGuildChannel guild = msg.Channel as SocketGuildChannel;
+
+            if (msgUser.Channel.Id != guildSetting.GetTTTChannel(guild.Guild.Id)) return;
 
             int prefixPosition = 0;
 
-            if (!(msgUser.HasCharPrefix(configFile.GetPrefix(), ref prefixPosition) ||
+            if (!(msgUser.HasCharPrefix(guildSetting.GetPrefix(guild.Guild.Id), ref prefixPosition) ||
             msgUser.HasMentionPrefix(this.client.CurrentUser, ref prefixPosition)) ||
             msgUser.Author.IsBot)
                 return;
 
             string[] command = msg.Content.Split(" ");
-            if (!(command[0] == configFile.GetPrefix() + "resetttt")) return;
+            if (!(command[0] == guildSetting.GetPrefix(guild.Guild.Id) + "resetttt")) return;
 
             this.playfieldStarted = false;
             this.playerList.Clear();
@@ -204,9 +210,13 @@ namespace Kagochan_DC_Bot.TicTacToe
             SocketUserMessage msgUser = msg as SocketUserMessage;
             if (msgUser == null) return;
 
-            if (msgUser.Channel.Id != configFile.GetTTTChannel()) return;
+            JSONDatabase.GuildSettings guildSetting = new JSONDatabase.GuildSettings();
+            SocketGuildChannel guild = msg.Channel as SocketGuildChannel;
+
+            if (msgUser.Channel.Id != guildSetting.GetTTTChannel(guild.Guild.Id)) return;
 
             int prefixPosition = 0;
+
             if (msgUser.HasMentionPrefix(client.CurrentUser, ref prefixPosition) || msgUser.Author.IsBot) return;
 
             if (playerList[0].turn == true)
